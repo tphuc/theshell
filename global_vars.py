@@ -1,0 +1,3 @@
+HISTORY_STACK = []
+STACK_CURRENT_INDEX = 0
+PROMPT = "intek-sh$ "
