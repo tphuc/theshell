@@ -7,8 +7,11 @@ https://docs.python.org/3/library/curses.html#module-curses
 https://steven.codes/blog/cs10/curses-tutorial/
 https://stackoverflow.com/questions/21784625/how-to-input-a-word-in-ncurses-screen
 """
+from global_vars import HISTORY_STACK, STACK_CURRENT_INDEX, PROMPT
+
+
 def process_KEY_UP(window, input):
-    from global_vars import HISTORY_STACK, STACK_CURRENT_INDEX, PROMPT
+    global STACK_CURRENT_INDEX, HISTORY_STACK, PROMPT
     try:
         curs_pos = curses.getsyx()
 
@@ -29,8 +32,9 @@ def process_KEY_UP(window, input):
         return input
     except IndexError:
         pass
+
 def process_KEY_DOWN(window, input):
-    from global_vars import STACK_CURRENT_INDEX, HISTORY_STACK, PROMPT
+    global STACK_CURRENT_INDEX, HISTORY_STACK, PROMPT
     try:
         curs_pos = curses.getsyx()
 
@@ -53,7 +57,7 @@ def process_KEY_DOWN(window, input):
         pass
 
 def my_raw_input(window):
-    from global_vars import PROMPT,HISTORY_STACK,STACK_CURRENT_INDEX
+    global HISTORY_STACK, STACK_CURRENT_INDEX, PROMPT
     curs_pos = curses.getsyx()
     window.addstr(curs_pos[0], 0, PROMPT)
 
@@ -74,7 +78,6 @@ def my_raw_input(window):
             curs_pos = curses.getsyx()
             curses.setsyx(curs_pos[0],len(PROMPT+input))
             curses.doupdate()
-
             char = ''  # reset the char empty
 
         if char == chr(curses.KEY_LEFT):
@@ -97,7 +100,7 @@ def my_raw_input(window):
     
     if input not in ['\n','']:
         HISTORY_STACK.append(input)
-        STACK_CURRENT_INDEX = -1
+        STACK_CURRENT_INDEX = 0
 
     window.addstr("\n")
     window.refresh()
@@ -110,12 +113,12 @@ def main():
     window.keypad(True)
     curses.noecho()
     while True:
-        choice = my_raw_input(window)
-        #choice = input("bash& ")
-        if choice == 'exit':
-            break
-        else:
-            try:
+        try:
+            choice = my_raw_input(window)
+            #choice = input("bash& ")
+            if choice == 'exit':
+                break
+            else:
                 """
                 #curses.noecho()
                 output = subprocess.check_output(choice.split()).decode()
@@ -125,21 +128,16 @@ def main():
                     window.addstr('\n')
                 pass
                 """
-                #urses.raw()
-                a = subprocess.run(choice.split())
-                #curses.noraw()
-                with open('history','w') as f:
-                    f.write(str(a.stdout))
-                
-            except Exception:
                 pass
+        except Exception:
+            pass
 
     curses.endwin()
 
 
 if __name__ == "__main__":
-
-    from global_vars import HISTORY_STACK, STACK_CURRENT_INDEX
+    global HISTORY_STACK
     main()
-    with open('history','w') as f:
-        f.write("\n".join(HISTORY_STACK))
+    f = open("history",'w')
+    f.write("\n".join(HISTORY_STACK))
+    f.close()
