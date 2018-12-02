@@ -58,16 +58,29 @@ class Shell:
         curses.doupdate()
 
     def line_count(self, string):
+        """ return number of line the string can takk place based on window width """
         return int((len(string) + 10) / self.width) + 1
 
-    def delete_nlines(self, n=1):
+    def delete_nlines(self, n=1, startl=None, revese=True):
+        """ 
+        Delete n lines in curses
+        - if "startl" not given: base on current curs position
+        - "reverse" to delete upward (bottom to top) and so on
+        """
         pos = curses.getsyx()
-        self.window.move(pos[0], self.width-1)
+        if startl is None:
+            self.window.move(pos[0], self.width-1)
+        else:
+            self.window.move(startl, self.width-1)
+
         for i in range(n):
             self.window.deleteln()
             if i != n-1:
                 pos = curses.getsyx()
-                self.window.move(pos[0]-1, self.width-1)
+                if revese:
+                    self.window.move(pos[0]-1, self.width-1)
+                else:
+                    self.window.move(pos[0]+1, self.width-1)
 
 
 
@@ -129,7 +142,11 @@ class Shell:
 
         input_pos = self.get_curs_pos()
         while char not in ['\n']:
-
+            ######################### KEY process ########################################
+            """ 
+                This block's purposes are handling special KEYS 
+                Add feature on this block
+            """
             if char == chr(curses.KEY_UP):
                 input = self.process_KEY_UP(input, input_pos)
                 self.set_curs_pos(x=len(Shell.PROMPT+input))
@@ -150,12 +167,25 @@ class Shell:
                     self.move_curs(0, 1)
                 char = ''
 
+            elif ord(char) == 127: # handle BACKSPACE
+                pos = self.get_curs_pos()
+                del_loc = pos[0]*self.width + pos[1] - (input_pos[0]*self.width + input_pos[1])
+                input = input[:del_loc-1] + input[del_loc:]
+                self.delete_nlines(self.line_count(input), input_pos[0], revese=False)
+                self.window.addstr(input_pos[0], 0, Shell.PROMPT + input)
+                self.set_curs_pos(pos[0], pos[1]-1)
+                char = ''
+
+
+
+
+            ##############################################################################################
             # Insert mode
             curs_pos = self.get_curs_pos()
             if char != '':
                 insert_loc = curs_pos[0]*self.width + curs_pos[1] - (input_pos[0]*self.width + input_pos[1])
                 input = input[:insert_loc] + char + input[insert_loc:]
-                self.window.addstr(input_pos[0], 10, input) # wrong
+                self.window.addstr(input_pos[0], 10, input)
                 self.set_curs_pos(curs_pos[0], curs_pos[1]+1)
             
             # loop again
