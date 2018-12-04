@@ -267,6 +267,7 @@ class Shell:
             #
             
             curs_pos = self.get_curs_pos()
+            
             if char != '':
                 insert_loc = curs_pos[0]*self.width + curs_pos[1] - (input_pos[0]*self.width + input_pos[1])
                 input = input[:insert_loc] + char + input[insert_loc:]
@@ -275,11 +276,10 @@ class Shell:
 
             curs_pos = self.get_curs_pos()
             #write_file('windowlog',self.window.instr(0,0).decode(),mode='w')
+            
+            # loop again
             self.write_win_log('windowlog')
             self.window.move(curs_pos[0],curs_pos[1])
-            self.window.refresh()
-            # loop again
-            
             char = chr(self.window.getch())
             
             
@@ -330,7 +330,7 @@ def main():
                 pass
 
         except Exception:
-            raise IndexError("bad!")
+            shell.printf("bad!")
             pass
 
     curses.endwin()
