@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
 import curses
+from completion import handle_completion
 
+def printf(string, end='\n'):
+    window = curses.getwin()
+    pos = curses.getsyx()
+    window.addstr(pos[0], pos[1], string+end)
+    window.refresh()
+
+
+    
 def insert (source_str, insert_str, pos):
     return source_str[:pos]+insert_str+source_str[pos:]
 
-def write_on_file(filename, content):
-    with open(filename,'w') as f:
-        f.write(content)
+def write_file(filename, content, mode='w'):
+    f = open(filename, mode)
+    f.write(content)
+    f.close()
 
 class Shell:
     HISTORY_STACK = []
@@ -20,7 +30,31 @@ class Shell:
         curses.noecho()
         self.window.keypad(True)
         self.last_cursor_pos = (0, 0)
+        self.write_win_file = True
+        self.windowlog = 'windowlog' 
         (self.height, self.width) =  self.window.getmaxyx()
+
+    def read_win_log(self, file):
+        data = ''
+        with open(file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('intek-sh$ '):
+                    data += '\n' + line
+                else:
+                    data += line
+        return data[1:]
+    
+    def write_win_log(self, file):
+        pos = self.get_curs_pos()
+        with open(self.windowlog,'w') as f:
+            for i in range(pos[0]+1):
+                data = self.window.instr(i,0).decode().strip()
+                if data.startswith('intek-sh') and i != 0:
+                    data = '\n' + data
+                f.write(data)
+
+
 
 
     def	get_str(self, prompt=""):
@@ -35,17 +69,21 @@ class Shell:
 
     def printf(self, string="", end='\n'):
         pos = self.get_curs_pos()
-        self.window.addstr(pos[0], pos[1], string+end)
-    
+        self.add_str(pos[0], pos[1], string+end)
+
+
+
     def add_str(self, y, x, string):
         self.window.addstr(y, x, string)
-        
+        self.window.refresh()
+
+
 
     def get_curs_pos(self):
         #self.window.refresh()
         pos = curses.getsyx()
         return (pos[0], pos[1])
-    
+
 
     def set_curs_pos(self, y=None, x=None):
         self.window.refresh()
@@ -62,7 +100,7 @@ class Shell:
         return int((len(string) + 10) / self.width) + 1
 
     def delete_nlines(self, n=1, startl=None, revese=True):
-        """ 
+        """
         Delete n lines in curses
         - if "startl" not given: base on current curs position
         - "reverse" to delete upward (bottom to top) and so on
@@ -100,7 +138,8 @@ class Shell:
                 Shell.STACK_CURRENT_INDEX -= 1
 
             if abs(Shell.STACK_CURRENT_INDEX) != len(Shell.HISTORY_STACK): # Not meet the start
-                self.delete_nlines(self.line_count(Shell.HISTORY_STACK[Shell.STACK_CURRENT_INDEX]))
+                self.delete_nlines(self.line_count(Shell.HISTORY_STACK[Shell.STACK_CURRENT_INDEX]), startl=curs_pos[0], revese=False)
+                #self.window.deleteln()
                 self.window.addstr(curs_pos[0], 0, Shell.PROMPT + Shell.HISTORY_STACK[Shell.STACK_CURRENT_INDEX-1]) #print the previous
                 input = Shell.HISTORY_STACK[Shell.STACK_CURRENT_INDEX-1]
                 Shell.STACK_CURRENT_INDEX -= 1
@@ -135,18 +174,41 @@ class Shell:
             return input
         except IndexError:
             pass
-    
+
     def process_input(self):
         char = self.get_ch(Shell.PROMPT)
         input = "" # inittial input
 
         input_pos = self.get_curs_pos()
+
+
         while char not in ['\n']:
             ######################### KEY process ########################################
             """ 
                 This block's purposes are handling special KEYS 
                 Add feature on this block
             """
+
+            ############# Handle window resize  ################################
+            
+
+            if ord(char) == 410:
+                #self.window.redrawwin()
+                #self.window.refresh()
+                pass
+                """
+                self.window.clear()
+                self.window.refresh()
+                data = read_win_file('window.txt')
+                self.window.addstr(0,0,data)
+                self.window.refresh()
+                char = ''
+                """
+                char = ''
+            
+            
+            ##################################################################
+
             if char == chr(curses.KEY_UP):
                 input = self.process_KEY_UP(input, input_pos)
                 self.set_curs_pos(x=len(Shell.PROMPT+input))
@@ -167,52 +229,96 @@ class Shell:
                     self.move_curs(0, 1)
                 char = ''
 
-            elif ord(char) == 127: # handle BACKSPACE
+            elif char == chr(127): # curses.BACKSPACE
                 pos = self.get_curs_pos()
                 del_loc = pos[0]*self.width + pos[1] - (input_pos[0]*self.width + input_pos[1])
-                input = input[:del_loc-1] + input[del_loc:]
+                if del_loc > 0:
+                    input = input[:del_loc-1] + input[del_loc:]
                 self.delete_nlines(self.line_count(input), input_pos[0], revese=False)
                 self.window.addstr(input_pos[0], 0, Shell.PROMPT + input)
-                self.set_curs_pos(pos[0], pos[1]-1)
+                if pos[1] > 10 or pos[0] != input_pos[0]:
+                    self.set_curs_pos(pos[0], pos[1]-1)
+                elif pos[1] == 10:
+                    self.set_curs_pos(pos[0], pos[1])
                 char = ''
 
+            elif ord(char) == 9: # curses.BTAB
+                input = handle_completion(input,'file')
+                self.window.addstr(input_pos[0], 10, input)
+                char = ''
 
+            elif char == chr(curses.KEY_DC):
+                pos = self.get_curs_pos()
+                del_loc = pos[0]*self.width + pos[1] - (input_pos[0]*self.width + input_pos[1]) + 1
+                if del_loc > 0:
+                    input = input[:del_loc-1] + input[del_loc:]
+                self.delete_nlines(self.line_count(input), input_pos[0], revese=False)
+                self.window.addstr(input_pos[0], 0, Shell.PROMPT + input)
+                self.set_curs_pos(pos[0], pos[1])
+                char = ''
 
-
+            
+            
+            
+                #self.window.move(pos)
             ##############################################################################################
             # Insert mode
+            
+            #
+            
             curs_pos = self.get_curs_pos()
             if char != '':
                 insert_loc = curs_pos[0]*self.width + curs_pos[1] - (input_pos[0]*self.width + input_pos[1])
                 input = input[:insert_loc] + char + input[insert_loc:]
                 self.window.addstr(input_pos[0], 10, input)
                 self.set_curs_pos(curs_pos[0], curs_pos[1]+1)
-            
+
+            curs_pos = self.get_curs_pos()
+            #write_file('windowlog',self.window.instr(0,0).decode(),mode='w')
+            self.write_win_log('windowlog')
+            self.window.move(curs_pos[0],curs_pos[1])
+            self.window.refresh()
             # loop again
+            
             char = chr(self.window.getch())
+            
+            
+        
+            
 
         if input not in ['\n','']:
             Shell.HISTORY_STACK.append(input)
             Shell.STACK_CURRENT_INDEX = 0
 
-        #set cursors
+        #pos = self.get_curs_pos()
+        write_file(self.windowlog, '\n'+Shell.PROMPT, mode = 'a')
+        
+
         self.window.addstr("\n")
         self.window.refresh()
+        
+        #set cursors
+
+        
+        #self.write_win_log('windowlog')
+        #self.set_curs_pos(pos[0]+1,pos[1])
         return input
 
 
 def main():
     shell = Shell()
-    
-    #curses.def_shell_mode()
+
+
+
     while True:
         try:
             choice = shell.process_input()
             #choice = input("bash& ")
             if choice == 'exit':
                 break
+            elif choice == 'print':
+                shell.printf("hello")
             else:
-                
                 """
                 #curses.noecho()
                 output = subprocess.check_output(choice.split()).decode()
@@ -224,6 +330,7 @@ def main():
                 pass
 
         except Exception:
+            raise IndexError("bad!")
             pass
 
     curses.endwin()
