@@ -34,7 +34,11 @@ class Shell:
         self.windowlog = 'windowlog' 
         (self.height, self.width) =  self.window.getmaxyx()
 
-    def read_win_log(self, file):
+    def read_win_log(self):
+        with open(self.windowlog, 'r') as f:
+            data = f.read()
+            return data + ' '
+        """
         data = ''
         with open(file, 'r') as f:
             for line in f:
@@ -44,7 +48,7 @@ class Shell:
                 else:
                     data += line
         return data[1:]
-    
+        """
     def write_win_log(self, file):
         pos = self.get_curs_pos()
         with open(self.windowlog,'w') as f:
@@ -53,6 +57,7 @@ class Shell:
                 if data.startswith('intek-sh') and i != 0:
                     data = '\n' + data
                 f.write(data)
+        self.window.move(pos[0], pos[1])
 
 
 
@@ -190,26 +195,21 @@ class Shell:
             """
 
             ############# Handle window resize  ################################
-            
 
             if ord(char) == 410:
-                #self.window.redrawwin()
-                #self.window.refresh()
-                pass
-                """
                 self.window.clear()
                 self.window.refresh()
-                data = read_win_file('window.txt')
+                data = self.read_win_log()
                 self.window.addstr(0,0,data)
                 self.window.refresh()
-                char = ''
-                """
+                input_pos = self.get_curs_pos()
+                (self.height, self.width) =  self.window.getmaxyx()
                 char = ''
             
             
             ##################################################################
 
-            if char == chr(curses.KEY_UP):
+            elif char == chr(curses.KEY_UP):
                 input = self.process_KEY_UP(input, input_pos)
                 self.set_curs_pos(x=len(Shell.PROMPT+input))
                 char = ''
@@ -258,28 +258,20 @@ class Shell:
                 char = ''
 
             
+      
             
-            
-                #self.window.move(pos)
             ##############################################################################################
             # Insert mode
-            
-            #
-            
             curs_pos = self.get_curs_pos()
-            
             if char != '':
                 insert_loc = curs_pos[0]*self.width + curs_pos[1] - (input_pos[0]*self.width + input_pos[1])
                 input = input[:insert_loc] + char + input[insert_loc:]
                 self.window.addstr(input_pos[0], 10, input)
                 self.set_curs_pos(curs_pos[0], curs_pos[1]+1)
 
-            curs_pos = self.get_curs_pos()
-            #write_file('windowlog',self.window.instr(0,0).decode(),mode='w')
             
-            # loop again
             self.write_win_log('windowlog')
-            self.window.move(curs_pos[0],curs_pos[1])
+            # loop again
             char = chr(self.window.getch())
             
             
@@ -290,30 +282,20 @@ class Shell:
             Shell.HISTORY_STACK.append(input)
             Shell.STACK_CURRENT_INDEX = 0
 
-        #pos = self.get_curs_pos()
+        # Write the PROMPT tp file when press Enter with APPEND mode
         write_file(self.windowlog, '\n'+Shell.PROMPT, mode = 'a')
-        
 
+        # Refresh the window and enter newline
         self.window.addstr("\n")
         self.window.refresh()
-        
-        #set cursors
-
-        
-        #self.write_win_log('windowlog')
-        #self.set_curs_pos(pos[0]+1,pos[1])
         return input
 
 
 def main():
     shell = Shell()
-
-
-
     while True:
         try:
             choice = shell.process_input()
-            #choice = input("bash& ")
             if choice == 'exit':
                 break
             elif choice == 'print':
@@ -330,8 +312,7 @@ def main():
                 pass
 
         except Exception:
-            shell.printf("bad!")
-            pass
+            raise Exception("bug!")
 
     curses.endwin()
 main()
