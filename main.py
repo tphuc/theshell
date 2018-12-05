@@ -37,18 +37,8 @@ class Shell:
     def read_win_log(self):
         with open(self.windowlog, 'r') as f:
             data = f.read()
-            return data + ' '
-        """
-        data = ''
-        with open(file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith('intek-sh$ '):
-                    data += '\n' + line
-                else:
-                    data += line
-        return data[1:]
-        """
+        return data + ' '
+
     def write_win_log(self, file):
         pos = self.get_curs_pos()
         with open(self.windowlog,'w') as f:
@@ -202,8 +192,9 @@ class Shell:
                 data = self.read_win_log()
                 self.window.addstr(0,0,data)
                 self.window.refresh()
-                input_pos = self.get_curs_pos()
+                step = input_pos[0]*self.height + self.width
                 (self.height, self.width) =  self.window.getmaxyx()
+                input_pos = (step // self.height, step % self.height) # update input location
                 char = ''
             
             
@@ -312,7 +303,8 @@ def main():
                 pass
 
         except Exception:
-            raise Exception("bug!")
+            #raise Exception("bug!")
+            pass
 
     curses.endwin()
 main()
